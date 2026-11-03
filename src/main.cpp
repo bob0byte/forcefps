@@ -11,8 +11,10 @@ using namespace geode::prelude;
 static bool g_enabled = true;
 static bool g_substep = true;
 static int g_fps = 240;
+static double g_accum = 0.0;
 
 static void applyFPS() {
+	g_accum = 0.0;
 	auto mod = Mod::get();
 	g_enabled = mod->getSettingValue<bool>("enabled");
 	g_substep = mod->getSettingValue<bool>("substep");
@@ -33,21 +35,36 @@ static void applyFPS() {
 	log::info("Force FPS: target {} (substep: {})", fps, g_substep);
 }
 
-// Splits each screen frame into several game updates, so the game loop
-// runs at the target FPS even when the screen caps how often frames happen.
-// Example: 90 Hz screen, target 240 -> each frame (~11.1 ms) runs ~3 updates.
+// Fixed-timestep game loop: time from each screen frame goes into an
+// accumulator, and the game is updated in exact 1/FPS slices. This keeps the
+// update rate steady at the target (e.g. 240) instead of jumping around with
+// small changes in frame timing.
 class $modify(ForceFPSScheduler, CCScheduler) {
 	void update(float dt) {
 		if (!g_enabled || !g_substep || g_fps <= 0 || dt <= 0.f) {
+			g_accum = 0.0;
 			CCScheduler::update(dt);
 			return;
 		}
-		int steps = static_cast<int>(std::round(dt * g_fps));
-		steps = std::clamp(steps, 1, 16); // cap to avoid a death spiral on lag spikes
-		float sub = dt / steps;
-		for (int i = 0; i < steps; i++) {
-			CCScheduler::update(sub);
+		double const step = 1.0 / g_fps;
+		g_accum += dt;
+
+		int steps = static_cast<int>(g_accum / step);
+		if (steps <= 0) {
+			// target is below the screen rate: just pass time through
+			CCScheduler::update(static_cast<float>(g_accum));
+			g_accum = 0.0;
+			return;
 		}
+		constexpr int kMaxSteps = 12; // stops lag spikes from snowballing
+		if (steps > kMaxSteps) {
+			steps = kMaxSteps;
+			g_accum = steps * step; // drop the backlog instead of catching up
+		}
+		for (int i = 0; i < steps; i++) {
+			CCScheduler::update(static_cast<float>(step));
+		}
+		g_accum -= steps * step;
 	}
 };
 
