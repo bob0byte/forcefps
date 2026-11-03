@@ -33,11 +33,13 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          for c in $(find "$GITHUB_WORKSPACE" .. -maxdepth 4 -name CMakeCache.txt 2>/dev/null); do
-            d=$(dirname "$c"); echo "::error::build dir $d"
-            cmake --build "$d" 2>&1 | grep -iE "error|fatal|undefined|failed" | head -9 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
-          done
-          ls -la "$GITHUB_WORKSPACE" | sed 's/^/::warning::/' | head -20
+          echo "::error::GEODE_SDK=$GEODE_SDK bindings=$GEODE_BINDINGS_REPO_PATH"
+          NDK=/usr/local/lib/android/sdk/ndk/29.0.14206865
+          ABI=arm64-v8a; [ "${{ matrix.config.target }}" = "Android32" ] && ABI=armeabi-v7a
+          rm -rf dbg
+          cmake -B dbg -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -G Ninja -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake -DANDROID_STL=c++_shared -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-23 -DGEODE_DONT_INSTALL_MODS=ON -DGEODE_TARGET_PLATFORM=${{ matrix.config.target }} > log.txt 2>&1 && cmake --build dbg >> log.txt 2>&1
+          grep -inE "error|fatal|undefined|failed|not found" log.txt | head -8 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+          tail -n 3 log.txt | while IFS= read -r l; do echo "::warning::${l:0:900}"; done
 
   package:
     name: Package builds
