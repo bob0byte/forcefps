@@ -29,6 +29,16 @@ jobs:
           combine: true
           target: ${{ matrix.config.target }}
 
+      - name: Report errors
+        if: failure()
+        shell: bash
+        run: |
+          for c in $(find "$GITHUB_WORKSPACE" .. -maxdepth 4 -name CMakeCache.txt 2>/dev/null); do
+            d=$(dirname "$c"); echo "::error::build dir $d"
+            cmake --build "$d" 2>&1 | grep -iE "error|fatal|undefined|failed" | head -9 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+          done
+          ls -la "$GITHUB_WORKSPACE" | sed 's/^/::warning::/' | head -20
+
   package:
     name: Package builds
     runs-on: ubuntu-24.04
