@@ -106,11 +106,27 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 			steps = kMaxSteps;
 			g_accum = steps * step; // drop the backlog instead of catching up
 		}
+		auto director = CCDirector::get();
+		auto scene = director->getRunningScene();
+		int done = 0;
 		for (int i = 0; i < steps; i++) {
+			// Stop extra updates as soon as the game changes scene (entering,
+			// leaving or restarting a level) or pauses. Updating a layer that
+			// is being torn down is what caused crashes.
+			if (i > 0 && (director->getNextScene() != nullptr
+				|| director->getRunningScene() != scene
+				|| director->isPaused())) {
+				break;
+			}
 			CCScheduler::update(static_cast<float>(step));
+			done++;
 		}
-		g_accum -= steps * step;
-		updateCounter(dt, steps);
+		if (done < steps) {
+			g_accum = 0.0; // drop leftover time after a scene change
+		} else {
+			g_accum -= steps * step;
+		}
+		updateCounter(dt, done);
 	}
 };
 
