@@ -5,7 +5,7 @@
 	},
 	"id": "ahmedtaher.force-fps",
 	"name": "Force FPS",
-	"version": "v1.3.1",
+	"version": "v1.4.0",
 	"developer": "Ahmed Taher",
 	"description": "Runs Geometry Dash's game loop at a custom FPS, independent of the screen's refresh rate.",
 	"settings": {
@@ -30,6 +30,12 @@
 			"name": "Run game at target FPS",
 			"description": "Runs the game's update loop several times per screen frame, so GD updates at your target FPS even if the screen is capped (e.g. 240 on a 90 Hz screen).",
 			"default": true
+		},
+		"substep-in-levels": {
+			"type": "bool",
+			"name": "Extra updates inside levels (unstable)",
+			"description": "GD already runs level physics at 240 TPS. Turning this on also runs extra updates inside levels, which can cause lag spikes and crashes.",
+			"default": false
 		},
 		"disable-vsync": {
 			"type": "bool",

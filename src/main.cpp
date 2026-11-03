@@ -4,6 +4,7 @@
 #include <Geode/ui/OverlayManager.hpp>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #ifdef GEODE_IS_ANDROID
 #include <EGL/egl.h>
 #endif
@@ -12,8 +13,11 @@ using namespace geode::prelude;
 
 static bool g_enabled = true;
 static bool g_substep = true;
+static bool g_inLevels = false;
 static int g_fps = 240;
 static double g_accum = 0.0;
+// Seconds left to run without extra updates after the phone fell behind.
+static double g_cooldown = 0.0;
 // The frame interval GD itself asked for, restored when the mod is off.
 static double g_gameInterval = 1.0 / 60.0;
 
@@ -59,6 +63,7 @@ static void applyFPS() {
 	auto mod = Mod::get();
 	g_enabled = mod->getSettingValue<bool>("enabled");
 	g_substep = mod->getSettingValue<bool>("substep");
+	g_inLevels = mod->getSettingValue<bool>("substep-in-levels");
 	g_fps = static_cast<int>(mod->getSettingValue<int64_t>("fps"));
 	g_showCounter = mod->getSettingValue<bool>("show-counter");
 
@@ -84,15 +89,30 @@ static void applyFPS() {
 // small changes in frame timing.
 class $modify(ForceFPSScheduler, CCScheduler) {
 	void update(float dt) {
-		if (!g_enabled || !g_substep || g_fps <= 0 || dt <= 0.f) {
+		// Inside levels GD already runs physics at 240 TPS by itself, and
+		// running the whole level update several times per frame is what
+		// crashed after deaths and in heavy levels. Off there by default.
+		bool const inLevel = !g_inLevels && (PlayLayer::get() || LevelEditorLayer::get());
+		if (!g_enabled || !g_substep || inLevel || g_fps <= 0 || dt <= 0.f) {
 			g_accum = 0.0;
 			CCScheduler::update(dt);
 			updateCounter(dt, 1);
 			return;
 		}
 		double const step = 1.0 / g_fps;
-		g_accum += dt;
 
+		// Anti-lag: after a hitch (dying, loading, heavy levels) or while the
+		// phone can't keep up, run a single normal update instead of piling on
+		// extra ones, which is what turned small hitches into big lag spikes.
+		if (g_cooldown > 0.0) g_cooldown -= dt;
+		if (dt > 1.0 / 30.0 || g_cooldown > 0.0) {
+			g_accum = 0.0;
+			CCScheduler::update(dt);
+			updateCounter(dt, 1);
+			return;
+		}
+
+		g_accum += dt;
 		int steps = static_cast<int>(g_accum / step);
 		if (steps <= 0) {
 			// target is below the screen rate: just pass time through
@@ -101,11 +121,14 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 			updateCounter(dt, 1);
 			return;
 		}
-		constexpr int kMaxSteps = 12; // stops lag spikes from snowballing
-		if (steps > kMaxSteps) {
-			steps = kMaxSteps;
+		// Only as many as needed for a normal frame (240 FPS on 90 Hz = 3).
+		int const maxSteps = std::max(2, static_cast<int>(std::ceil(g_fps / 60.0)));
+		if (steps > maxSteps) {
+			steps = maxSteps;
 			g_accum = steps * step; // drop the backlog instead of catching up
 		}
+
+		auto const start = std::chrono::steady_clock::now();
 		auto director = CCDirector::get();
 		auto scene = director->getRunningScene();
 		int done = 0;
@@ -126,6 +149,11 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 		} else {
 			g_accum -= steps * step;
 		}
+		// If the updates alone used most of the frame, the phone is falling
+		// behind: back off for a second so the game stays smooth.
+		double const spent = std::chrono::duration<double>(
+			std::chrono::steady_clock::now() - start).count();
+		if (spent > dt * 0.7) g_cooldown = 1.0;
 		updateCounter(dt, done);
 	}
 };
@@ -149,6 +177,7 @@ $on_mod(Loaded) {
 	listenForSettingChanges<int64_t>("fps", [](int64_t) { applyFPS(); });
 	listenForSettingChanges<bool>("enabled", [](bool) { applyFPS(); });
 	listenForSettingChanges<bool>("substep", [](bool) { applyFPS(); });
+	listenForSettingChanges<bool>("substep-in-levels", [](bool) { applyFPS(); });
 	listenForSettingChanges<bool>("show-counter", [](bool) { applyFPS(); });
 	listenForSettingChanges<bool>("disable-vsync", [](bool) { applyFPS(); });
 }
