@@ -12,10 +12,10 @@ jobs:
       matrix:
         config:
         - name: Android64
-          os: ubuntu-latest
+          os: ubuntu-24.04
           target: Android64
         - name: Android32
-          os: ubuntu-latest
+          os: ubuntu-24.04
           target: Android32
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
@@ -31,7 +31,7 @@ jobs:
 
   package:
     name: Package builds
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: ['build']
     steps:
       - uses: geode-sdk/build-geode-mod/combine@main
