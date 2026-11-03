@@ -53,8 +53,8 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 
 $on_mod(Loaded) {
 	Loader::get()->queueInMainThread([] { applyFPS(); });
-	listenForSettingChanges("fps", [](int64_t) { applyFPS(); });
-	listenForSettingChanges("enabled", [](bool) { applyFPS(); });
-	listenForSettingChanges("substep", [](bool) { applyFPS(); });
-	listenForSettingChanges("disable-vsync", [](bool) { applyFPS(); });
+	listenForSettingChanges<int64_t>("fps", [](int64_t) { applyFPS(); });
+	listenForSettingChanges<bool>("enabled", [](bool) { applyFPS(); });
+	listenForSettingChanges<bool>("substep", [](bool) { applyFPS(); });
+	listenForSettingChanges<bool>("disable-vsync", [](bool) { applyFPS(); });
 }
