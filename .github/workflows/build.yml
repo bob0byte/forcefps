@@ -1,5 +1,8 @@
 name: Build Geode Mod
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
@@ -53,3 +56,10 @@ jobs:
         with:
           name: Build Output
           path: ${{ steps.build.outputs.build-output }}
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Force FPS (latest build)
+          files: ${{ steps.build.outputs.build-output }}/*.geode
+          make_latest: true
