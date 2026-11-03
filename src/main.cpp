@@ -1,7 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/CCDirector.hpp>
-#include <Geode/ui/OverlayManager.hpp>
 #include <algorithm>
 #include <cmath>
 #include <chrono>
@@ -24,38 +23,45 @@ static double g_gameInterval = 1.0 / 60.0;
 // Accurate counter: averages over half a second so it doesn't twitch.
 // FPS = frames your screen shows, TPS = game updates per second.
 static bool g_showCounter = true;
-static CCLabelBMFont* g_label = nullptr;
 static double g_counterTime = 0.0;
 static int g_frames = 0;
 static int g_ticks = 0;
 
 static void updateCounter(float dt, int ticks) {
-	if (!g_showCounter) {
-		if (g_label) g_label->setVisible(false);
-		return;
-	}
-	if (!g_label) {
-		g_label = CCLabelBMFont::create("", "bigFont.fnt");
-		g_label->setAnchorPoint({0.f, 1.f});
-		g_label->setScale(0.35f);
-		g_label->setOpacity(200);
-		auto size = CCDirector::get()->getWinSize();
-		g_label->setPosition({5.f, size.height - 5.f});
-		g_label->setZOrder(9999);
-		OverlayManager::get()->addChild(g_label);
-	}
-	g_label->setVisible(true);
 	g_frames += 1;
 	g_ticks += ticks;
 	g_counterTime += dt;
-	if (g_counterTime >= 0.5) {
-		int fps = static_cast<int>(std::round(g_frames / g_counterTime));
-		int tps = static_cast<int>(std::round(g_ticks / g_counterTime));
-		g_label->setString(fmt::format("FPS {}  |  TPS {}", fps, tps).c_str());
-		g_counterTime = 0.0;
-		g_frames = 0;
-		g_ticks = 0;
+	if (g_counterTime < 0.5) return;
+
+	int fps = static_cast<int>(std::round(g_frames / g_counterTime));
+	int tps = static_cast<int>(std::round(g_ticks / g_counterTime));
+	g_counterTime = 0.0;
+	g_frames = 0;
+	g_ticks = 0;
+
+	// The label lives inside the current screen (scene) and is looked up
+	// fresh each time, never kept around. Keeping one label alive across
+	// screens crashed when GD reloaded its textures (after leaving the app,
+	// changing settings, or loading heavy levels).
+	auto scene = CCDirector::get()->getRunningScene();
+	if (!scene || CCDirector::get()->getNextScene()) return;
+	auto label = static_cast<CCLabelBMFont*>(scene->getChildByID("force-fps-counter"_spr));
+	if (!g_showCounter) {
+		if (label) label->removeFromParent();
+		return;
 	}
+	if (!label) {
+		label = CCLabelBMFont::create("", "bigFont.fnt");
+		if (!label) return;
+		label->setID("force-fps-counter"_spr);
+		label->setAnchorPoint({0.f, 1.f});
+		label->setScale(0.35f);
+		label->setOpacity(200);
+		auto size = CCDirector::get()->getWinSize();
+		label->setPosition({5.f, size.height - 5.f});
+		scene->addChild(label, 9999);
+	}
+	label->setString(fmt::format("FPS {}  |  TPS {}", fps, tps).c_str());
 }
 
 static void applyFPS() {
