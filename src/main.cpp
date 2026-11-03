@@ -1,6 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCScheduler.hpp>
 #include <Geode/modify/CCDirector.hpp>
+#include <Geode/ui/OverlayManager.hpp>
 #include <algorithm>
 #include <cmath>
 #ifdef GEODE_IS_ANDROID
@@ -16,12 +17,50 @@ static double g_accum = 0.0;
 // The frame interval GD itself asked for, restored when the mod is off.
 static double g_gameInterval = 1.0 / 60.0;
 
+// Accurate counter: averages over half a second so it doesn't twitch.
+// FPS = frames your screen shows, TPS = game updates per second.
+static bool g_showCounter = true;
+static CCLabelBMFont* g_label = nullptr;
+static double g_counterTime = 0.0;
+static int g_frames = 0;
+static int g_ticks = 0;
+
+static void updateCounter(float dt, int ticks) {
+	if (!g_showCounter) {
+		if (g_label) g_label->setVisible(false);
+		return;
+	}
+	if (!g_label) {
+		g_label = CCLabelBMFont::create("", "bigFont.fnt");
+		g_label->setAnchorPoint({0.f, 1.f});
+		g_label->setScale(0.35f);
+		g_label->setOpacity(200);
+		auto size = CCDirector::get()->getWinSize();
+		g_label->setPosition({5.f, size.height - 5.f});
+		g_label->setZOrder(9999);
+		OverlayManager::get()->addChild(g_label);
+	}
+	g_label->setVisible(true);
+	g_frames += 1;
+	g_ticks += ticks;
+	g_counterTime += dt;
+	if (g_counterTime >= 0.5) {
+		int fps = static_cast<int>(std::round(g_frames / g_counterTime));
+		int tps = static_cast<int>(std::round(g_ticks / g_counterTime));
+		g_label->setString(fmt::format("FPS {}  |  TPS {}", fps, tps).c_str());
+		g_counterTime = 0.0;
+		g_frames = 0;
+		g_ticks = 0;
+	}
+}
+
 static void applyFPS() {
 	g_accum = 0.0;
 	auto mod = Mod::get();
 	g_enabled = mod->getSettingValue<bool>("enabled");
 	g_substep = mod->getSettingValue<bool>("substep");
 	g_fps = static_cast<int>(mod->getSettingValue<int64_t>("fps"));
+	g_showCounter = mod->getSettingValue<bool>("show-counter");
 
 	// Goes through the hook below, which swaps in the target FPS when enabled.
 	CCDirector::get()->setAnimationInterval(g_gameInterval);
@@ -48,6 +87,7 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 		if (!g_enabled || !g_substep || g_fps <= 0 || dt <= 0.f) {
 			g_accum = 0.0;
 			CCScheduler::update(dt);
+			updateCounter(dt, 1);
 			return;
 		}
 		double const step = 1.0 / g_fps;
@@ -58,6 +98,7 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 			// target is below the screen rate: just pass time through
 			CCScheduler::update(static_cast<float>(g_accum));
 			g_accum = 0.0;
+			updateCounter(dt, 1);
 			return;
 		}
 		constexpr int kMaxSteps = 12; // stops lag spikes from snowballing
@@ -69,6 +110,7 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 			CCScheduler::update(static_cast<float>(step));
 		}
 		g_accum -= steps * step;
+		updateCounter(dt, steps);
 	}
 };
 
@@ -91,5 +133,6 @@ $on_mod(Loaded) {
 	listenForSettingChanges<int64_t>("fps", [](int64_t) { applyFPS(); });
 	listenForSettingChanges<bool>("enabled", [](bool) { applyFPS(); });
 	listenForSettingChanges<bool>("substep", [](bool) { applyFPS(); });
+	listenForSettingChanges<bool>("show-counter", [](bool) { applyFPS(); });
 	listenForSettingChanges<bool>("disable-vsync", [](bool) { applyFPS(); });
 }

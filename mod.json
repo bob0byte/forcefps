@@ -5,7 +5,7 @@
 	},
 	"id": "ahmedtaher.force-fps",
 	"name": "Force FPS",
-	"version": "v1.2.1",
+	"version": "v1.3.0",
 	"developer": "Ahmed Taher",
 	"description": "Runs Geometry Dash's game loop at a custom FPS, independent of the screen's refresh rate.",
 	"settings": {
@@ -36,6 +36,12 @@
 			"name": "Try to disable VSync (Android)",
 			"description": "Lets the phone draw frames beyond the screen's refresh rate. You can't see them, it makes FPS jump around and uses more battery. Leave off unless testing.",
 			"default": false
+		},
+		"show-counter": {
+			"type": "bool",
+			"name": "Show FPS/TPS counter",
+			"description": "Steady counter: FPS = frames your screen shows, TPS = game updates per second. Other FPS counters show random numbers with this mod because the game updates several times per frame.",
+			"default": true
 		}
 	}
 }
