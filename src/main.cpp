@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCScheduler.hpp>
+#include <Geode/modify/CCDirector.hpp>
 #include <algorithm>
 #include <cmath>
 #ifdef GEODE_IS_ANDROID
@@ -12,6 +13,8 @@ static bool g_enabled = true;
 static bool g_substep = true;
 static int g_fps = 240;
 static double g_accum = 0.0;
+// The frame interval GD itself asked for, restored when the mod is off.
+static double g_gameInterval = 1.0 / 60.0;
 
 static void applyFPS() {
 	g_accum = 0.0;
@@ -20,8 +23,9 @@ static void applyFPS() {
 	g_substep = mod->getSettingValue<bool>("substep");
 	g_fps = static_cast<int>(mod->getSettingValue<int64_t>("fps"));
 
-	double fps = g_enabled ? g_fps : 60.0;
-	CCDirector::get()->setAnimationInterval(1.0 / fps);
+	// Goes through the hook below, which swaps in the target FPS when enabled.
+	CCDirector::get()->setAnimationInterval(g_gameInterval);
+	double fps = g_enabled ? g_fps : 1.0 / g_gameInterval;
 
 #ifdef GEODE_IS_ANDROID
 	// Ask the driver not to block on the screen's refresh (VSync).
@@ -68,8 +72,22 @@ class $modify(ForceFPSScheduler, CCScheduler) {
 	}
 };
 
+// GD (and Android, when you leave and return to the app) can reset the frame
+// interval. Remember what it wanted, but keep our target while enabled.
+class $modify(ForceFPSDirector, CCDirector) {
+	void setAnimationInterval(double interval) {
+		if (interval > 0.0) g_gameInterval = interval;
+		if (g_enabled && g_fps > 0) interval = 1.0 / g_fps;
+		CCDirector::setAnimationInterval(interval);
+	}
+};
+
 $on_mod(Loaded) {
-	Loader::get()->queueInMainThread([] { applyFPS(); });
+	Loader::get()->queueInMainThread([] {
+		double current = CCDirector::get()->getAnimationInterval();
+		if (current > 0.0) g_gameInterval = current;
+		applyFPS();
+	});
 	listenForSettingChanges<int64_t>("fps", [](int64_t) { applyFPS(); });
 	listenForSettingChanges<bool>("enabled", [](bool) { applyFPS(); });
 	listenForSettingChanges<bool>("substep", [](bool) { applyFPS(); });
