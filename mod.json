@@ -5,9 +5,9 @@
 	},
 	"id": "ahmedtaher.force-fps",
 	"name": "Force FPS",
-	"version": "v2.0.0",
+	"version": "v2.1.0",
 	"developer": "Ahmed Taher",
-	"description": "Runs Geometry Dash at a steady custom FPS on Android, with a frame limiter so it never goes above the target.",
+	"description": "Runs Geometry Dash levels at a steady custom FPS on Android. Menus stay at normal FPS.",
 	"settings": {
 		"enabled": {
 			"type": "bool",

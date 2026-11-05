@@ -11,9 +11,15 @@ using Clock = std::chrono::steady_clock;
 
 static bool g_enabled = true;
 static int g_fps = 240;
+// True while you are inside a level. The mod only changes FPS there.
+static bool g_inLevel = false;
 // The frame interval GD itself asked for, restored when the mod is off.
 static double g_gameInterval = 1.0 / 60.0;
 static Clock::time_point g_nextFrame{};
+
+static bool active() {
+	return g_enabled && g_inLevel && g_fps > 0;
+}
 
 static void applyFPS() {
 	auto mod = Mod::get();
@@ -21,7 +27,7 @@ static void applyFPS() {
 	g_fps = static_cast<int>(mod->getSettingValue<int64_t>("fps"));
 	g_nextFrame = Clock::time_point{};
 
-	// Goes through the hook below, which swaps in the target when enabled.
+	// Goes through the hook below, which swaps in the target inside levels.
 	CCDirector::get()->setAnimationInterval(g_gameInterval);
 
 #ifdef GEODE_IS_ANDROID
@@ -29,7 +35,7 @@ static void applyFPS() {
 	// (90 on your phone). Turning it off lets GD run at the target instead.
 	EGLDisplay display = eglGetCurrentDisplay();
 	if (display != EGL_NO_DISPLAY) {
-		bool off = g_enabled && mod->getSettingValue<bool>("disable-vsync");
+		bool off = active() && mod->getSettingValue<bool>("disable-vsync");
 		eglSwapInterval(display, off ? 0 : 1);
 	}
 #endif
@@ -38,7 +44,7 @@ static void applyFPS() {
 // Frame limiter: holds every frame to exactly 1/target seconds, so GD's own
 // FPS counter stays at the target instead of jumping above it.
 static void limitFrame() {
-	if (!g_enabled || g_fps <= 0) return;
+	if (!active()) return;
 	auto const interval = std::chrono::duration_cast<Clock::duration>(
 		std::chrono::duration<double>(1.0 / g_fps));
 	auto now = Clock::now();
@@ -68,11 +74,17 @@ class $modify(ForceFPSDirector, CCDirector) {
 	// the frame interval. Remember what it wanted, but keep the target.
 	void setAnimationInterval(double interval) {
 		if (interval > 0.0) g_gameInterval = interval;
-		if (g_enabled && g_fps > 0) interval = 1.0 / g_fps;
+		if (active()) interval = 1.0 / g_fps;
 		CCDirector::setAnimationInterval(interval);
 	}
 
 	void drawScene() {
+		// Switch on when a level starts and back to normal when you leave it.
+		bool const inLevel = PlayLayer::get() != nullptr;
+		if (inLevel != g_inLevel) {
+			g_inLevel = inLevel;
+			applyFPS();
+		}
 		limitFrame();
 		CCDirector::drawScene();
 	}
