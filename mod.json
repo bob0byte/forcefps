@@ -5,9 +5,9 @@
 	},
 	"id": "ahmedtaher.force-fps",
 	"name": "Force FPS",
-	"version": "v1.4.1",
+	"version": "v2.0.0",
 	"developer": "Ahmed Taher",
-	"description": "Runs Geometry Dash's game loop at a custom FPS, independent of the screen's refresh rate.",
+	"description": "Runs Geometry Dash at a steady custom FPS on Android, with a frame limiter so it never goes above the target.",
 	"settings": {
 		"enabled": {
 			"type": "bool",
@@ -25,28 +25,10 @@
 				"input": true
 			}
 		},
-		"substep": {
-			"type": "bool",
-			"name": "Run game at target FPS",
-			"description": "Runs the game's update loop several times per screen frame, so GD updates at your target FPS even if the screen is capped (e.g. 240 on a 90 Hz screen).",
-			"default": true
-		},
-		"substep-in-levels": {
-			"type": "bool",
-			"name": "Extra updates inside levels (unstable)",
-			"description": "GD already runs level physics at 240 TPS. Turning this on also runs extra updates inside levels, which can cause lag spikes and crashes.",
-			"default": false
-		},
 		"disable-vsync": {
 			"type": "bool",
-			"name": "Try to disable VSync (Android)",
-			"description": "Lets the phone draw frames beyond the screen's refresh rate. You can't see them, it makes FPS jump around and uses more battery. Leave off unless testing.",
-			"default": false
-		},
-		"show-counter": {
-			"type": "bool",
-			"name": "Show FPS/TPS counter",
-			"description": "Steady counter: FPS = frames your screen shows, TPS = game updates per second. Other FPS counters show random numbers with this mod because the game updates several times per frame.",
+			"name": "Disable VSync",
+			"description": "Needed to go above your screen's refresh rate (90 Hz). Off = GD is capped at 90.",
 			"default": true
 		}
 	}
