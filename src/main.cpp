@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/CCDirector.hpp>
+#include <Geode/modify/LoadingLayer.hpp>
 #include <chrono>
 #include <thread>
 #ifdef GEODE_IS_ANDROID
@@ -87,6 +88,27 @@ class $modify(ForceFPSDirector, CCDirector) {
 		}
 		limitFrame();
 		CCDirector::drawScene();
+	}
+};
+
+// Texture quality: GD picks this automatically on phones and has no menu
+// option for it. Runs right before GD loads its textures, so changing the
+// setting needs a restart of GD.
+class $modify(ForceFPSLoadingLayer, LoadingLayer) {
+	bool init(bool refresh) {
+		auto choice = Mod::get()->getSettingValue<std::string>("texture-quality");
+		TextureQuality target = kTextureQualityHigh;
+		if (choice == "Medium") target = kTextureQualityMedium;
+		else if (choice == "Low") target = kTextureQualityLow;
+
+		auto director = CCDirector::get();
+		// Only ever lowers quality, never raises it past what GD picked.
+		if (target < director->getLoadedTextureQuality()) {
+			GameManager::get()->m_texQuality = static_cast<int>(target);
+			director->updateContentScale(target);
+			log::info("Force FPS: texture quality set to {}", choice);
+		}
+		return LoadingLayer::init(refresh);
 	}
 };
 

@@ -5,7 +5,7 @@
 	},
 	"id": "ahmedtaher.force-fps",
 	"name": "Force FPS",
-	"version": "v2.1.0",
+	"version": "v2.2.0",
 	"developer": "Ahmed Taher",
 	"description": "Runs Geometry Dash levels at a steady custom FPS on Android. Menus stay at normal FPS.",
 	"settings": {
@@ -30,6 +30,17 @@
 			"name": "Disable VSync",
 			"description": "Needed to go above your screen's refresh rate (90 Hz). Off = GD is capped at 90.",
 			"default": true
+		},
+		"texture-quality": {
+			"type": "string",
+			"name": "Texture quality",
+			"description": "Lower texture quality to make loading and heavy levels lighter. High = GD's normal. Medium = 75% fewer pixels (closest to your 60%). Low = blurry. Restart GD after changing.",
+			"default": "Medium",
+			"one-of": [
+				"High",
+				"Medium",
+				"Low"
+			]
 		}
 	}
 }
